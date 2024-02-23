@@ -1,4 +1,4 @@
-    
+from functions import sortDOFS, fillGlobalMatrix, findPinnedDOFS, deletePinnedRowsAndColumns, printNodes, calculateQMatrix, fillFMatrix 
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy.core.multiarray import dtype
@@ -6,6 +6,7 @@ from scipy.spatial import Delaunay
 from matplotlib.tri import Triangulation
 from matplotlib.widgets import Slider
 from random import randrange
+import sys
 
 
 class Element: 
@@ -18,6 +19,26 @@ class Element:
         self.area = 0.5 * self.detJ
         self.thickness = thickness
         self.matrixK = self.thickness * self.area * np.matmul(np.matmul(np.transpose(self.matrixB), self.matrixD), self.matrixB)
+        self.strain = []
+
+
+    def calculateStrain(self, matrixQ, dofsToStay):
+        dfs = dofsToStay.sort()
+        mq = {}
+        q = []
+        for i in range(len(matrixQ)):
+            mq[dofsToStay[i]] = matrixQ[i]
+        for n in self.nodes: 
+            if n.DOFNumber[0] in mq.keys(): 
+                q.append(mq[n.DOFNumber[0]])
+            elif n.DOFNumber[1] in mq.keys(): 
+                q.append(mq[n.DOFNumber[1]])
+            else: 
+                q.append(0)
+        self.strain = np.matmul(np.matmul(self.matrixD, self.matrixD), np.array(q))
+        print(self.strain)
+        
+
 
     def calculateDetJ(self):
         self.detJ = self.nodeDif(0,1,3) * self.nodeDif(1,2,3) - self.nodeDif(0,2,3) * self.nodeDif(1,1,3)
@@ -49,7 +70,7 @@ elements = []
 points = []
 numberOfNodes = 3
 
-
+np.set_printoptions(threshold=sys.maxsize)
 def fillElements(triCoordinates, triSimplices):
     global elements, thickness
     seenNodes = {}
@@ -69,8 +90,6 @@ def fillElements(triCoordinates, triSimplices):
                 node = Node(triSimplices[i][j], nodeCoordinates, 0, True)             
             elif nodeCoordinates[1] == 0 and nodeCoordinates[0] != 0 and nodeCoordinates[0] != xRange: # bottom w/0 first and last
                 node = Node(triSimplices[i][j], nodeCoordinates, 0, True) 
-            elif nodeCoordinates[1] == xRange and nodeCoordinates[0] != 0 and nodeCoordinates[0] != xRange: # top w/0 first and last
-                node = Node(triSimplices[i][j], nodeCoordinates, 0, True)
             else: 
                 node = Node(triSimplices[i][j], nodeCoordinates, 0, False)
             # print('node', node.nodeNumber)
@@ -79,61 +98,12 @@ def fillElements(triCoordinates, triSimplices):
         e = Element(nodes, thickness)
         elements.append(e)
 
-    print("seenNodes", seenNodes)
+    # print("seenNodes", seenNodes)
     return elements
 
-def sortDOFS(nodes): 
-    result = []
-    for i in range(len(nodes)):
-        print(nodes[i].DOFNumber)
-        result.append(nodes[i].DOFNumber[0])
-        result.append(nodes[i].DOFNumber[1])
-    result.sort()
-    return result
-
-def fillGlobalMatrix(elements, matrix):
-    print('le', len(elements))
-    for i in range(len(elements)):
-        element = elements[i]
-        DOFS = sortDOFS(element.nodes)
-        print('DOFS', DOFS)
-        for j in range(len(element.matrixK)):
-            for k in range(len(element.matrixK[j])):
-                matrix[DOFS[j] - 1, DOFS[k] - 1] += element.matrixK[j][k]
-        return matrix
 
 
-def findPinnedDOFS(elements):
-    DOFSToDelete = set()
-    DOFSToStay = set()
-    for element in elements:
-        for node in element.nodes:
-            if node.pinned: 
-                DOFSToDelete.add(node.DOFNumber[0])
-                DOFSToDelete.add(node.DOFNumber[1])
-            else:
-                DOFSToStay.add(node.DOFNumber[0])
-                DOFSToStay.add(node.DOFNumber[1])
-    return [DOFSToDelete, DOFSToStay]
-
-def deletePinnedRowsAndColumns(numbersToDelete,globalMatrix):
-    deleted = 0
-    print('DOFSOTDELETE',numbersToDelete)
-    for number in numbersToDelete:
-        print(number)
-        globalMatrix = np.delete(globalMatrix, number - 1 - deleted, 0)
-        globalMatrix = np.delete(globalMatrix, number - 1 - deleted, 1)
-        deleted += 1
-    return globalMatrix
-
-
-def printNodes(elements):
-    for element in elements:
-        for node in element.nodes:
-            print('node', node.pinned, node.coordinates, node.DOFNumber)
-
-
-globalMatrix = np.empty([numberOfNodes*numberOfNodes * 2,numberOfNodes*numberOfNodes * 2])
+globalMatrix = np.zeros([numberOfNodes*numberOfNodes * 2,numberOfNodes*numberOfNodes * 2])
 basePoints = np.linspace(0,xRange,numberOfNodes)
 fig, ax = plt.subplots()
 axSlider = fig.add_axes([0.25, 0.1, 0.65, 0.03])
@@ -151,6 +121,7 @@ mesh = ax.triplot(points[:,0], points[:,1], tri.simplices)
 line, = ax.plot(points[:,0], points[:,1], 'o')
 
 
+
 # print('points', points)
 # print('trianglus', tri.simplices)
 # print(points[tri.simplices])
@@ -161,18 +132,48 @@ for i in range(len(elements)):
     print('element', i) 
     for j in range(3):
         print('nodes', elements[i].nodes[j].DOFNumber, elements[i].nodes[j].coordinates)
-print('empty global', globalMatrix)
+        print('B', elements[i].matrixB)
+        print('D', elements[i].matrixD)
+
+        print('K', elements[i].matrixK)
+# print('empty global', globalMatrix)
 globalMatrix = fillGlobalMatrix(elements, globalMatrix)
 print('global before', globalMatrix)
 
 DOFS = findPinnedDOFS(elements)
+
+print('DOFS_TO_STAY', DOFS[1])
+matrixF = fillFMatrix(elements, DOFS[1])
+print('F', matrixF) 
 globalMatrix = deletePinnedRowsAndColumns(DOFS[0], globalMatrix)
+matrixQ = calculateQMatrix(globalMatrix, matrixF)
+print('q',matrixQ) 
 print('global', globalMatrix)
+maxStrain = 0
+strains = []
+for i in range(len(elements)):
+    elements[i].calculateStrain(matrixQ, list(DOFS[1]))
+    strains.append(elements[i].strain[0])
+    if maxStrain < elements[i].strain[0]: 
+        maxStrain = elements[i].strain[0]
+
+
+tpc = ax.tripcolor(points[:, 0], points[:,1],strains, shading='flat')
+fig.colorbar(tpc)
+# for e in elements:
+#     x = [] 
+#     for n in e.nodes: 
+#         x.append(n.coordinates)
+#     t = plt.Polygon(x, color='red')
+#     ax.gca().add_patch(t)
+print('max', maxStrain)
 def updateSlider(val):
     global points, elements, globalMatrix
+
     newPoints = []
     print('updated', val)
     basePoints = np.linspace(0,100,val)
+    globalMatrix = np.empty([val*val*2,val* val*2])
     for i in range(basePoints.size):
         for j in range(basePoints.size):
             points = newPoints.append([basePoints[i] , basePoints[j]])
