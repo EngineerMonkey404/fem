@@ -1,44 +1,76 @@
-
+from scipy.spatial import Delaunay
 import numpy as np
+from classes import Element, Node
+from matrepr import mdisplay, mprint
 
+def fillElements(triCoordinates, triSimplices, thickness, force, borderX, borderY):
+    seenNodes = {}
+    elements = []
+    for i in range(len(triSimplices)):
+        nodes = []
+        for j in range(3):
+            nodeCoordinates = triCoordinates[i][j]
+            node = None
+            if seenNodes.get(triSimplices[i,j]):
+                nodes.append(seenNodes.get(triSimplices[i,j]))
+                continue
+            elif nodeCoordinates[0] == borderX and (nodeCoordinates[1] == 0 or nodeCoordinates[1] == borderY): # right top and bot nodes
+                node = Node(triSimplices[i][j], nodeCoordinates, force, True)
+            elif nodeCoordinates[0] == borderX and not (nodeCoordinates[1] == 0 or nodeCoordinates[1] == borderY): # right pillar with forces
+                node = Node(triSimplices[i][j], nodeCoordinates, force, False)
+            elif nodeCoordinates[0] == 0: # left pillar
+                node = Node(triSimplices[i][j], nodeCoordinates, 0, True)             
+            elif nodeCoordinates[1] == 0 and nodeCoordinates[0] != 0 and nodeCoordinates[0] != borderX: # bottom w/0 first and last
+                node = Node(triSimplices[i][j], nodeCoordinates, 0, True) 
+            else: 
+                node = Node(triSimplices[i][j], nodeCoordinates, 0, False)
+            # print('node', node.nodeNumber)
+            nodes.append(node)
+            seenNodes[triSimplices[i][j]] = node
+        e = Element(nodes, thickness)
+        elements.append(e)
+
+    # print("seenNodes", seenNodes)
+    return elements
 
 def calculateQMatrix(globalMatrix, matrixF):
-    print('G', globalMatrix)
-    return np.matmul(np.transpose(globalMatrix), matrixF)
-    # return np.linalg.solve(globalMatrix, matrixF)
+    # return np.matmul(np.transpose(globalMatrix), matrixF)
+    return np.linalg.solve(globalMatrix, matrixF)
 
 
 def sortDOFS(nodes): 
     result = []
     for i in range(len(nodes)):
-        print(nodes[i].DOFNumber)
+        # print(nodes[i].DOFNumber)
         result.append(nodes[i].DOFNumber[0])
         result.append(nodes[i].DOFNumber[1])
     result.sort()
     return result
 
 def fillGlobalMatrix(elements, matrix):
-    print('le', len(elements))
+    print(len(elements))
     for i in range(len(elements)):
         element = elements[i]
         DOFS = sortDOFS(element.nodes)
-        print('DOFS', DOFS)
+        # print('el', element)
+        # print('DFS', DOFS)
         for j in range(len(element.matrixK)):
             for k in range(len(element.matrixK[j])):
                 matrix[DOFS[j] - 1, DOFS[k] - 1] += element.matrixK[j][k]
-        return matrix
+    return matrix
 
 
 def fillFMatrix(elements, dofsToStay):
-    dofsToStay = list(dofsToStay)
+    DOFTS = list(dofsToStay)
+    DOFTS.sort()
     seen = set()
-    print('DFST', dofsToStay)
+    print('DFST', DOFTS)
     matrixF = []
     for e in elements: 
         for n in e.nodes:
-            if n.DOFNumber[0] in dofsToStay and not (n.DOFNumber[0] in seen):
+            if n.DOFNumber[0] in DOFTS and not (n.DOFNumber[0] in seen):
                 matrixF.append(n.force)
-            if n.DOFNumber[1] in dofsToStay and not (n.DOFNumber[1] in seen):
+            if n.DOFNumber[1] in DOFTS and not (n.DOFNumber[1] in seen):
                 matrixF.append(n.force)
             seen.add(n.DOFNumber[1])
             seen.add(n.DOFNumber[0])
@@ -61,9 +93,9 @@ def findPinnedDOFS(elements):
 
 def deletePinnedRowsAndColumns(numbersToDelete,globalMatrix):
     deleted = 0
-    print('DOFSOTDELETE',numbersToDelete)
+    # print('DOFSOTDELETE',numbersToDelete)
     for number in numbersToDelete:
-        print(number)
+        # print(number)
         globalMatrix = np.delete(globalMatrix, number - 1 - deleted, 0)
         globalMatrix = np.delete(globalMatrix, number - 1 - deleted, 1)
         deleted += 1
@@ -72,5 +104,58 @@ def deletePinnedRowsAndColumns(numbersToDelete,globalMatrix):
 
 def printNodes(elements):
     for element in elements:
-        for node in element.nodes:
-            print('node', node.pinned, node.coordinates, node.DOFNumber)
+        # print('K_MATRIX', element.matrixK)
+        DOFS = sortDOFS(element.nodes)
+        mprint(element.matrixK, title=None, row_labels = DOFS, col_labels=DOFS, fill_value="--", num_after_dots=100)
+        # for node in element.nodes:
+        #     print('node_number', node.nodeNumber)
+        #     print('node', node.pinned, node.coordinates, node.DOFNumber)
+
+
+
+def recalculateStress(numberOfNodes, force,thickness, borderX, borderY, ax,cax,fig,):
+    newPoints = []
+    basePoints = np.linspace(0,100,numberOfNodes)
+    globalMatrix = np.empty([numberOfNodes*numberOfNodes*2,numberOfNodes* numberOfNodes*2])
+    for i in range(basePoints.size):
+        for j in range(basePoints.size):
+            points = newPoints.append([basePoints[i] , basePoints[j]])
+    points =  np.array(newPoints)
+    ax.cla()
+    line, = ax.plot(points[:,0], points[:,1], 'o')
+    line.set_data(points[:, 0], points[:, 1])
+    tri = Delaunay(points)
+    ax.triplot(points[:,0], points[:,1], tri.simplices)
+    ax.plot(points[:,0], points[:,1], 'o')
+    elements = fillElements(points[tri.simplices], tri.simplices,thickness, force, borderX, borderY)
+    globalMatrix = fillGlobalMatrix(elements, globalMatrix)
+
+    # mprint(globalMatrix, max_rows=18, max_cols=18)
+    DOFS = findPinnedDOFS(elements)
+    globalMatrix = deletePinnedRowsAndColumns(DOFS[0], globalMatrix)
+
+    print('points', points)
+    print('trianglus', tri.simplices)
+    print('node coordinates', points[tri.simplices])
+    printNodes(elements)
+
+    # mprint(globalMatrix,row_labels=list(DOFS[1]), col_labels=list(DOFS[1]), max_rows=18, max_cols=18)
+    matrixF = fillFMatrix(elements, DOFS[1])
+    mprint(matrixF, col_labels=list(DOFS[1]))
+    matrixQ = calculateQMatrix(globalMatrix, matrixF)
+    mprint(matrixQ, col_labels=list(DOFS[1]))
+    strains = []
+    maxStrain = 0
+    for i in range(len(elements)):
+        elements[i].calculateStrain(matrixQ, list(DOFS[1]))
+        strains.append(elements[i].strain[0])
+        if maxStrain < elements[i].strain[0]: 
+            maxStrain = elements[i].strain[0]
+    cax.clear()
+    if len(fig.axes) == 4:
+        fig.axes[3].clear()
+    tpc = ax.tripcolor(points[:, 0], points[:,1],strains, cmap="gist_rainbow_r")
+    fig.colorbar(tpc,ax=ax,cax=cax )
+    # print('global', globalMatrix)
+    fig.canvas.draw_idle()
+    fig.canvas.flush_events()
