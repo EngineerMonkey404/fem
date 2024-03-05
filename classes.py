@@ -1,6 +1,8 @@
 
+import matrepr
 import numpy as np
-
+from matrepr import mprint
+from math import sqrt
 kPuas=0.3
 yunga=2000*1e6
 thickness = 0.5
@@ -19,7 +21,7 @@ class Element:
 
 
     def calculateStrain(self, matrixQ, dofsToStay):
-        dfs = dofsToStay.sort()
+        # print('MQ', matrixQ)
         mq = {}
         q = []
         for i in range(len(matrixQ)):
@@ -27,13 +29,19 @@ class Element:
         for n in self.nodes: 
             if n.DOFNumber[0] in mq.keys(): 
                 q.append(mq[n.DOFNumber[0]])
-            elif n.DOFNumber[1] in mq.keys(): 
+            else:
+                q.append(0)
+            if n.DOFNumber[1] in mq.keys(): 
                 q.append(mq[n.DOFNumber[1]])
             else: 
                 q.append(0)
 
-        self.strain = np.matmul(np.matmul(self.matrixD, self.matrixD), np.array(q))
-        # self.strain = [sqrt(self.strain[1]**2 - self.strain[0]*self.strain[1] + self.strain[0]**2)]
+        # mprint(self.matrixB)
+        # mprint(self.matrixD)
+        DB = np.matmul(self.matrixD, self.matrixB) 
+        self.strain = np.matmul(DB, np.array(q))
+        # print('STRAIN', self.strain)
+        self.strain = sqrt(self.strain[0]**2 - self.strain[0]*self.strain[1] + self.strain[1]**2 + 3 * self.strain[2]**2)
         # print(self.strain)
         
 

@@ -22,6 +22,8 @@ def fillElements(triCoordinates, triSimplices, thickness, force, borderX, border
                 node = Node(triSimplices[i][j], nodeCoordinates, 0, True)             
             elif nodeCoordinates[1] == 0 and nodeCoordinates[0] != 0 and nodeCoordinates[0] != borderX: # bottom w/0 first and last
                 node = Node(triSimplices[i][j], nodeCoordinates, 0, True) 
+            elif nodeCoordinates[1] == borderY and nodeCoordinates[0] != 0 and nodeCoordinates[0] != borderX: # top w/0 first and last 
+                node = Node(triSimplices[i][j], nodeCoordinates, 0, True) 
             else: 
                 node = Node(triSimplices[i][j], nodeCoordinates, 0, False)
             # print('node', node.nodeNumber)
@@ -64,7 +66,6 @@ def fillFMatrix(elements, dofsToStay):
     DOFTS = list(dofsToStay)
     DOFTS.sort()
     seen = set()
-    print('DFST', DOFTS)
     matrixF = []
     for e in elements: 
         for n in e.nodes:
@@ -107,9 +108,8 @@ def printNodes(elements):
         # print('K_MATRIX', element.matrixK)
         DOFS = sortDOFS(element.nodes)
         mprint(element.matrixK, title=None, row_labels = DOFS, col_labels=DOFS, fill_value="--", num_after_dots=100)
-        # for node in element.nodes:
-        #     print('node_number', node.nodeNumber)
-        #     print('node', node.pinned, node.coordinates, node.DOFNumber)
+        for node in element.nodes:
+            print('node', node.pinned, node.force,node.coordinates, node.DOFNumber)
 
 
 
@@ -134,27 +134,26 @@ def recalculateStress(numberOfNodes, force,thickness, borderX, borderY, ax,cax,f
     DOFS = findPinnedDOFS(elements)
     globalMatrix = deletePinnedRowsAndColumns(DOFS[0], globalMatrix)
 
-    print('points', points)
-    print('trianglus', tri.simplices)
-    print('node coordinates', points[tri.simplices])
-    printNodes(elements)
+    # print('points', points)
+    # print('trianglus', tri.simplices)
+    # print('node coordinates', points[tri.simplices])
+    # printNodes(elements)
 
     # mprint(globalMatrix,row_labels=list(DOFS[1]), col_labels=list(DOFS[1]), max_rows=18, max_cols=18)
     matrixF = fillFMatrix(elements, DOFS[1])
-    mprint(matrixF, col_labels=list(DOFS[1]))
+    # mprint(matrixF, col_labels=list(DOFS[1]))
     matrixQ = calculateQMatrix(globalMatrix, matrixF)
-    mprint(matrixQ, col_labels=list(DOFS[1]))
+    # mprint(matrixQ, col_labels=list(DOFS[1]))
     strains = []
     maxStrain = 0
     for i in range(len(elements)):
         elements[i].calculateStrain(matrixQ, list(DOFS[1]))
-        strains.append(elements[i].strain[0])
-        if maxStrain < elements[i].strain[0]: 
-            maxStrain = elements[i].strain[0]
+        strains.append(elements[i].strain)
+    strains[0] = 0
     cax.clear()
     if len(fig.axes) == 4:
         fig.axes[3].clear()
-    tpc = ax.tripcolor(points[:, 0], points[:,1],strains, cmap="gist_rainbow_r")
+    tpc = ax.tripcolor(points[:, 0], points[:,1],strains, cmap="jet")
     fig.colorbar(tpc,ax=ax,cax=cax )
     # print('global', globalMatrix)
     fig.canvas.draw_idle()
