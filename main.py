@@ -8,7 +8,7 @@ import sys
 
 xRange = 100
 force = 1000
-numberOfNodes = 7
+numberOfNodes = 15
 
 np.set_printoptions(threshold=sys.maxsize) # Вывод всего np.array без пропуска элементов
 
@@ -25,7 +25,6 @@ recalculateStress(numberOfNodes, force, thickness, xRange, xRange,ax,cax, fig)
 
 def updateNumberOfNodes(val):
     global numberOfNodes,ax, line, fig, cax
-    print(val)
     numberOfNodes = val
     recalculateStress(numberOfNodes, force,thickness, xRange, xRange, ax,cax,fig)
 

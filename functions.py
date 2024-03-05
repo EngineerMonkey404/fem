@@ -56,9 +56,12 @@ def fillGlobalMatrix(elements, matrix):
         DOFS = sortDOFS(element.nodes)
         # print('el', element)
         # print('DFS', DOFS)
+        mprint(element.matrixK)
         for j in range(len(element.matrixK)):
             for k in range(len(element.matrixK[j])):
                 matrix[DOFS[j] - 1, DOFS[k] - 1] += element.matrixK[j][k]
+    print("MATRICA")
+    mprint(matrix)
     return matrix
 
 
@@ -114,9 +117,10 @@ def printNodes(elements):
 
 
 def recalculateStress(numberOfNodes, force,thickness, borderX, borderY, ax,cax,fig,):
+    print(force)
     newPoints = []
     basePoints = np.linspace(0,100,numberOfNodes)
-    globalMatrix = np.empty([numberOfNodes*numberOfNodes*2,numberOfNodes* numberOfNodes*2])
+    globalMatrix = np.zeros([numberOfNodes*numberOfNodes*2,numberOfNodes* numberOfNodes*2])
     for i in range(basePoints.size):
         for j in range(basePoints.size):
             points = newPoints.append([basePoints[i] , basePoints[j]])
@@ -151,8 +155,6 @@ def recalculateStress(numberOfNodes, force,thickness, borderX, borderY, ax,cax,f
         strains.append(elements[i].strain)
     strains[0] = 0
     cax.clear()
-    if len(fig.axes) == 4:
-        fig.axes[3].clear()
     tpc = ax.tripcolor(points[:, 0], points[:,1],strains, cmap="jet")
     fig.colorbar(tpc,ax=ax,cax=cax )
     # print('global', globalMatrix)
