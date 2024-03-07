@@ -47,7 +47,8 @@ class Element:
 
 
     def calculateDetJ(self): # Верно
-        self.detJ = self.nodeDif(0,1,3) * self.nodeDif(1,2,3) - self.nodeDif(0,2,3) * self.nodeDif(1,1,3) # x13 * y23 - x23 * y13 - Jacobian
+        # self.detJ = self.nodeDif(0,1,3) * self.nodeDif(1,2,3) - self.nodeDif(0,2,3) * self.nodeDif(1,1,3) # x13 * y23 - x23 * y13 - Jacobian
+        self.detJ = 1
 
     def calculateB(self ): # Верно
         self.matrixB = 1 / self.detJ * np.array([[self.nodeDif(1,2,3), 0, self.nodeDif(1,3,1), 0, self.nodeDif(1,1,2), 0],

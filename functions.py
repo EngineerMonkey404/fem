@@ -1,7 +1,10 @@
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 from scipy.spatial import Delaunay
 import numpy as np
 from classes import Element, Node
 from matrepr import mdisplay, mprint
+from matplotlib.tri import Triangulation
 
 def fillElements(triCoordinates, triSimplices, thickness, force, borderX, borderY):
     seenNodes = {}
@@ -56,12 +59,9 @@ def fillGlobalMatrix(elements, matrix):
         DOFS = sortDOFS(element.nodes)
         # print('el', element)
         # print('DFS', DOFS)
-        mprint(element.matrixK)
         for j in range(len(element.matrixK)):
             for k in range(len(element.matrixK[j])):
                 matrix[DOFS[j] - 1, DOFS[k] - 1] += element.matrixK[j][k]
-    print("MATRICA")
-    mprint(matrix)
     return matrix
 
 
@@ -106,18 +106,20 @@ def deletePinnedRowsAndColumns(numbersToDelete,globalMatrix):
     return globalMatrix
 
 
-def printNodes(elements):
+def printNodes(elements: list[Element]):
     for element in elements:
         # print('K_MATRIX', element.matrixK)
         DOFS = sortDOFS(element.nodes)
         mprint(element.matrixK, title=None, row_labels = DOFS, col_labels=DOFS, fill_value="--", num_after_dots=100)
+        print('STRESS',element.strain) 
         for node in element.nodes:
             print('node', node.pinned, node.force,node.coordinates, node.DOFNumber)
+        
 
 
 
-def recalculateStress(numberOfNodes, force,thickness, borderX, borderY, ax,cax,fig,):
-    print(force)
+def recalculateStress(numberOfNodes: int, force: float, thickness: float , borderX: float, borderY: float, ax: Axes,cax: Axes,fig: Figure):
+    # print(force)
     newPoints = []
     basePoints = np.linspace(0,100,numberOfNodes)
     globalMatrix = np.zeros([numberOfNodes*numberOfNodes*2,numberOfNodes* numberOfNodes*2])
@@ -125,13 +127,27 @@ def recalculateStress(numberOfNodes, force,thickness, borderX, borderY, ax,cax,f
         for j in range(basePoints.size):
             points = newPoints.append([basePoints[i] , basePoints[j]])
     points =  np.array(newPoints)
+    triangles = []
+    for i in range(len(points)):
+        point = points[i]
+        if point[0] == borderX or point[1] == borderY:
+            continue 
+        triangles.append([i, i+numberOfNodes, i+numberOfNodes+1])
+        triangles.append([i, i+1, i+numberOfNodes+1])
+    # print(points)
+    # print(triangles)
     ax.cla()
     line, = ax.plot(points[:,0], points[:,1], 'o')
     line.set_data(points[:, 0], points[:, 1])
-    tri = Delaunay(points)
-    ax.triplot(points[:,0], points[:,1], tri.simplices)
-    ax.plot(points[:,0], points[:,1], 'o')
-    elements = fillElements(points[tri.simplices], tri.simplices,thickness, force, borderX, borderY)
+    tri = Triangulation(points[:,0], points[:,1], triangles=triangles)
+    # tri = Delaunay(points)
+    # ax.triplot(points[:,0], points[:,1], tri.simplices, zorder=10)
+    # ax.plot(points[:,0], points[:,1], 'o')
+    # elements = fillElements(points[tri.simplices], tri.simplices,thickness, force, borderX, borderY)
+
+    ax.triplot(points[:,0], points[:,1], tri.triangles)
+    # ax.plot(points[:,0], points[:,1], 'o')
+    elements = fillElements(points[tri.triangles], tri.triangles,thickness, force, borderX, borderY)
     globalMatrix = fillGlobalMatrix(elements, globalMatrix)
 
     # mprint(globalMatrix, max_rows=18, max_cols=18)
@@ -147,16 +163,17 @@ def recalculateStress(numberOfNodes, force,thickness, borderX, borderY, ax,cax,f
     matrixF = fillFMatrix(elements, DOFS[1])
     # mprint(matrixF, col_labels=list(DOFS[1]))
     matrixQ = calculateQMatrix(globalMatrix, matrixF)
-    # mprint(matrixQ, col_labels=list(DOFS[1]))
+    mprint(matrixQ, col_labels=list(DOFS[1]))
     strains = []
-    maxStrain = 0
     for i in range(len(elements)):
         elements[i].calculateStrain(matrixQ, list(DOFS[1]))
         strains.append(elements[i].strain)
     strains[0] = 0
     cax.clear()
-    tpc = ax.tripcolor(points[:, 0], points[:,1],strains, cmap="jet")
-    fig.colorbar(tpc,ax=ax,cax=cax )
+    tpc = ax.tripcolor(points[:, 0], points[:,1],strains,triangles=triangles, cmap="jet")
+    # tpx = ax.tripcolor(tri, strains, shading="gouraud", cmap="jet")
+    fig.colorbar(tpc,ax=ax,cax=cax)
     # print('global', globalMatrix)
+    printNodes(elements)
     fig.canvas.draw_idle()
     fig.canvas.flush_events()
