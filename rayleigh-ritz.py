@@ -12,12 +12,10 @@ F = 3043478
 print(EI)
 np.set_printoptions(threshold=sys.maxsize)
 fig, ax = plt.subplots()
-fig1, ax1 = plt.subplots()
-
-xRange = 0.02
+fig1, ax1 = plt.subplots() 
+xRange = 0.02 
 yRange = 0.1
-
-yNodes = 100 
+yNodes = 100
 xNodes = 100
 
 yPoints = np.linspace(0, yRange, yNodes)
