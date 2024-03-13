@@ -3,23 +3,22 @@ import matplotlib.pyplot as plt
 import sys
 from sympy import *
 from matplotlib.tri import Triangulation
-
-I = 0.003
-E = 20_000_000
+I = 0.00013
+# I = 0.003
+E = 65e6
 EI = E*I
-F = 45
+F = 3043478
 
 print(EI)
 np.set_printoptions(threshold=sys.maxsize)
 fig, ax = plt.subplots()
 fig1, ax1 = plt.subplots()
 
-xRange = 5
-yRange = 100
+xRange = 0.02
+yRange = 0.1
 
-yNodes = 9 
-xNodes = 5
-
+yNodes = 100 
+xNodes = 100
 
 yPoints = np.linspace(0, yRange, yNodes)
 xPoints = np.linspace(0, xRange, xNodes)
@@ -31,11 +30,10 @@ for xp in xPoints:
         points.append([xp,yp])
 
 
-stressPoints = points
 points = np.array(points)
 
 
-x = Symbol('x')
+y = Symbol('y')
 a0 = Symbol('a0') 
 a1 = Symbol('a1') 
 a2 = Symbol('a2') 
@@ -44,16 +42,16 @@ a4 = Symbol('a4')
 a5 = Symbol('a5') 
 a6 = Symbol('a6') 
 
-yApprox = a2*x**2 + a3*x**3 + a4*x**4 + a5*x**5 + a6*x**6
+xApprox = a2*y**2 + a3*y**3 + a4*y**4 + a5*y**5 + a6*y**6
 
 
-print(yApprox)
-print(diff(yApprox, x))
-print(diff(yApprox,x,2))
-print(integrate(diff(yApprox, x, 2), (x,0, yRange)))
-ISE = integrate((EI / 2) * diff(yApprox, x, 2) ** 2,(x, 0, yRange))
+print(xApprox)
+# print(diff(xApprox, y))
+# print(diff(xApprox,y,2))
+# print(integrate(diff(xApprox, x, 2), (y,0, yRange)))
+ISE = integrate((EI / 2) * diff(xApprox, y, 2) ** 2,(y, 0, yRange))
 
-W = integrate(45000 * yApprox, (x,0, yRange))
+W = integrate(F * xApprox, (y,0, yRange))
 
 PE = ISE - W
 
@@ -65,18 +63,20 @@ Eq5 = diff(PE, a6)
 
 solution = solve([Eq1, Eq2, Eq3, Eq4, Eq5], [a2, a3,a4,a5,a6])
 
-print(ISE)
-[print(eq) for eq in [Eq1, Eq2, Eq3, Eq4, Eq5]]
-print(solution)
+# print(ISE)
+# [print(eq) for eq in [Eq1, Eq2, Eq3, Eq4, Eq5]]
+# print(solution)
 
-print(yApprox.subs(solution))
-
-
-for p in stressPoints:
-    if p[1] <= 25:
-        continue
-    solution['x'] = p[0]
-    p[0] = p[0] + yApprox.subs(solution)
+print(xApprox.subs(solution))
+stressPoints = []
+for p in points:
+    if p[0] == 0 :
+        solution['y'] = p[1]
+        # print(xApprox.subs(solution))
+        stressPoints.append([xApprox.subs(solution), p[1]])
+    # if p[0] == xRange:
+    #     solution['y'] = p[1]
+    #     stressPoints.append([xApprox.subs(solution) + xRange, p[1]])
 
 stressPoints = np.array(stressPoints,dtype='float64')
 
@@ -84,13 +84,13 @@ tri = Triangulation(points[:,0], points[:,1])
 ax.triplot(points[:,0], points[:,1], tri.triangles)
 
 
-print('points', points)
-print('sPoints', stressPoints)
+# print('points', points)
+# print('sPoints', stressPoints)
 
 tri1 = Triangulation(stressPoints[:,0], stressPoints[:,1])
-ax1.triplot(stressPoints[:,0], stressPoints[:,1], tri1.triangles)
+ax1.plot(stressPoints[:,0], stressPoints[:,1])
 
-p1 = plot(yApprox.subs(solution))
+p1 = plot(xApprox.subs(solution))
 p1.show()
 plt.show()
 
