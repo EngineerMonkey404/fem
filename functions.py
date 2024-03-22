@@ -116,9 +116,40 @@ def printNodes(elements: list[Element]):
             print('node', node.pinned, node.force,node.coordinates, node.DOFNumber)
         
 
+def calculateDeformationPoints(elements: list[Element], matrixQ, DOFS, points):
+    newPoints = []
+    nodes = {}
+    for el in elements:
+        for node in el.nodes:
+            for i in range(len(DOFS)):
+                if DOFS[i] in node.DOFNumber:
+                    nodes[DOFS[i]] = [i,node.coordinates]
+    print('N',nodes)
+    for p in points:
+        pnp = np.array(p)
+        for (k, v) in nodes.items():
+            if (pnp == v[1]).all():
+                print(pnp)
+                if k % 2 == 1:
+                    p[0] = p[0] - matrixQ[v[0]]
+                    if p[0] < 0:
+                        p[0]= 0
+                    if p[0] >= 100:
+                        p[0] = 100
+                    
+                else: 
+                    p[1] = p[1] - matrixQ[v[0]] * 1e5
+                    if p[1] < 0:
+                        p[1] = 0
+                    if p[1] >= 100:
+                        p[1] = 100
+        newPoints.append(p)
+    print(newPoints)
+    return np.array(newPoints)
 
 
-def recalculateStress(numberOfNodes: int, force: float, thickness: float , borderX: float, borderY: float, ax: Axes,cax: Axes,fig: Figure):
+
+def recalculateStress(numberOfNodes: int, force: float, thickness: float , borderX: float, borderY: float, ax: Axes,cax: Axes,fig: Figure, ax1: Axes):
     # print(force)
     newPoints = []
     basePoints = np.linspace(0,100,numberOfNodes)
@@ -154,15 +185,16 @@ def recalculateStress(numberOfNodes: int, force: float, thickness: float , borde
     DOFS = findPinnedDOFS(elements)
     globalMatrix = deletePinnedRowsAndColumns(DOFS[0], globalMatrix)
 
-    # print('points', points)
+    print('points', points)
     # print('trianglus', tri.simplices)
-    # print('node coordinates', points[tri.simplices])
+    # print('node coordinates', points[tri.triangles])
     # printNodes(elements)
 
     # mprint(globalMatrix,row_labels=list(DOFS[1]), col_labels=list(DOFS[1]), max_rows=18, max_cols=18)
     matrixF = fillFMatrix(elements, DOFS[1])
     # mprint(matrixF, col_labels=list(DOFS[1]))
     matrixQ = calculateQMatrix(globalMatrix, matrixF)
+    print('MATRIX Q')
     mprint(matrixQ, col_labels=list(DOFS[1]))
     strains = []
     for i in range(len(elements)):
@@ -174,6 +206,13 @@ def recalculateStress(numberOfNodes: int, force: float, thickness: float , borde
     # tpx = ax.tripcolor(tri, strains, shading="gouraud", cmap="jet")
     fig.colorbar(tpc,ax=ax,cax=cax)
     # print('global', globalMatrix)
-    printNodes(elements)
+    # printNodes(elements)
+    deformationPoints = calculateDeformationPoints(elements, matrixQ, list(DOFS[1]), points);
+    ax1.cla()
+    line1, = ax1.plot(deformationPoints[:, 0], deformationPoints[:,1], 'o')
+    line1.set_data(deformationPoints[:, 0], deformationPoints[:,1])
+    tri1 = Triangulation(deformationPoints[:, 0], deformationPoints[:,1])
+    ax1.triplot(tri1)
+
     fig.canvas.draw_idle()
     fig.canvas.flush_events()

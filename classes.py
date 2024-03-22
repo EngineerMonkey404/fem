@@ -4,7 +4,7 @@ import numpy as np
 from matrepr import mprint
 from math import sqrt
 kPuas=0.3
-yunga=2000*1e6
+yunga=200*1e3
 thickness = 0.5
 
 class Element: 
